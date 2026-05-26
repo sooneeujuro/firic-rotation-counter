@@ -1,0 +1,39 @@
+# Citation File Format — https://citation-file-format.github.io/
+# After Zenodo publishes the release, replace the `doi:` field below with the
+# Zenodo-issued DOI. GitHub auto-renders this as a "Cite this repository"
+# button on the repo page.
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "firic-rotation-counter: automated rotation counting from ROV underwater flowmeter videos"
+abstract: >
+  A two-stage ROI pipeline (manual coarse box + automatic flicker-based fine ROI)
+  with HSV color masking and smoke-aware peak interpolation for measuring
+  impeller rotation rate from ROV-captured hydrothermal-vent flowmeter videos.
+  Validated against ~230 manually-counted 30-second segments across 10 dive videos
+  (96.5 % rotation match, 0.0 % median relative RPM error).
+type: software
+version: "0.1.0"
+date-released: "2026-05-27"
+license: MIT
+repository-code: "https://github.com/sooneeujuro/firic-rotation-counter"
+url: "https://github.com/sooneeujuro/firic-rotation-counter"
+# doi: "10.5281/zenodo.XXXXXXX"        # TODO: uncomment & fill after Zenodo publishes
+keywords:
+  - rotation counting
+  - hydrothermal vent
+  - flowmeter
+  - ROV
+  - underwater video analysis
+  - OpenCV
+  - peak detection
+  - computer vision
+authors:
+  - family-names: "Kim"
+    given-names: "Heejun"
+    email: "sooneeujuro@gmail.com"
+    orcid: "https://orcid.org/0000-0001-5336-1377"
+    affiliation: "Korea Institute of Ocean Science & Technology"
+# Add co-authors here if any:
+#  - family-names: "..."
+#    given-names: "..."
+#    affiliation: "..."

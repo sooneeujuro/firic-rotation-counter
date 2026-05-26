@@ -1,0 +1,23 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Large binaries (videos are not redistributed)
+*.mov
+*.mp4
+*.avi
+
+# Internal measurement data (not for public distribution)
+data/*.xlsx
+data/*.xls
+
+# Local outputs / scratch
+output/
+samples/
+*.tmp
+
+.vscode/
+.idea/
+.DS_Store
