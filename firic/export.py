@@ -16,6 +16,9 @@ from datetime import datetime
 
 import openpyxl
 import pandas as pd
+from openpyxl.chart import LineChart, Reference
+from openpyxl.chart.layout import Layout, ManualLayout
+from openpyxl.chart.trendline import Trendline
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
@@ -271,6 +274,47 @@ def _write_sheet(wb, sheet_name: str, raw: pd.DataFrame, res: pd.DataFrame, indi
     c.font = FONT_META
     c.alignment = LEFT
     ws.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=14)
+
+    # RPM time-series chart (manual + auto vs timestamp)
+    n_data = len(data)
+    if n_data >= 2:
+        chart = LineChart()
+        chart.title = sheet_name
+        chart.x_axis.title = "time (s)"
+        chart.y_axis.title = "RPM"
+        chart.height = 9
+        chart.width = 18
+        chart.legend.position = "b"
+
+        first, last = 5, 5 + n_data - 1
+        # Manual RPM (column E = 5), Auto RPM (column I = 9), Timestamp (column F = 6)
+        manual_ref = Reference(ws, min_col=5, min_row=first, max_row=last)
+        auto_ref = Reference(ws, min_col=9, min_row=first, max_row=last)
+        x_ref = Reference(ws, min_col=6, min_row=first, max_row=last)
+
+        chart.add_data(manual_ref, titles_from_data=False)
+        chart.add_data(auto_ref, titles_from_data=False)
+        chart.set_categories(x_ref)
+
+        chart.series[0].graphicalProperties = openpyxl.chart.shapes.GraphicalProperties(solidFill="1F77B4")
+        chart.series[0].graphicalProperties.line.solidFill = "1F77B4"
+        chart.series[0].graphicalProperties.line.width = 20000
+        chart.series[0].smooth = False
+        chart.series[0].tx = openpyxl.chart.series.SeriesLabel(v="Manual")
+
+        chart.series[1].graphicalProperties = openpyxl.chart.shapes.GraphicalProperties(solidFill="D62728")
+        chart.series[1].graphicalProperties.line.solidFill = "D62728"
+        chart.series[1].graphicalProperties.line.width = 18000
+        chart.series[1].graphicalProperties.line.dashStyle = "dash"
+        chart.series[1].smooth = False
+        chart.series[1].tx = openpyxl.chart.series.SeriesLabel(v="Auto")
+
+        # mean line via trendline (linear w/ forced constant ≈ moving avg-ish);
+        # simpler: skip trendline and let the lines speak. Add reference line by
+        # writing the mean into a helper column? we'll skip to keep the sheet clean.
+
+        chart_anchor = f"P{first}"
+        ws.add_chart(chart, chart_anchor)
 
     _autosize(ws, min_w=12, max_w=24)
     ws.freeze_panes = "A5"
