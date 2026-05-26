@@ -153,8 +153,8 @@ from firic.roi import auto_fine_roi
 
 If you use this software in research, please cite the archived release:
 
-> AUTHOR_LAST, AUTHOR_FIRST (2026). *firic-rotation-counter: automated
-> rotation counting from ROV underwater flowmeter videos* (Version 0.1.0)
+> Kim, Heejun (2026). *firic-rotation-counter: automated rotation
+> counting from ROV underwater flowmeter videos* (Version 0.1.0)
 > [Software]. Zenodo. https://doi.org/10.5281/zenodo.20402770
 
 Machine-readable citation metadata is in
