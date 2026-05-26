@@ -275,46 +275,57 @@ def _write_sheet(wb, sheet_name: str, raw: pd.DataFrame, res: pd.DataFrame, indi
     c.alignment = LEFT
     ws.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=14)
 
-    # RPM time-series chart (manual + auto vs timestamp)
+    # RPM time-series chart (auto RPM + mean line)
     n_data = len(data)
     if n_data >= 2:
-        chart = LineChart()
-        chart.title = sheet_name
-        chart.x_axis.title = "time (s)"
-        chart.y_axis.title = "RPM"
-        chart.height = 9
-        chart.width = 18
-        chart.legend.position = "b"
+        # Helper column O (15) = repeated mean of auto RPM. Used only for the chart;
+        # column is hidden from the user view.
+        valid_auto = res["rpm_auto"].dropna()
+        if len(valid_auto) > 0:
+            mean_auto = float(valid_auto.mean())
+            for i in range(n_data):
+                c = ws.cell(row=5 + i, column=15, value=mean_auto)
+                c.number_format = "0.00"
+            ws.column_dimensions[get_column_letter(15)].hidden = True
 
-        first, last = 5, 5 + n_data - 1
-        # Manual RPM (column E = 5), Auto RPM (column I = 9), Timestamp (column F = 6)
-        manual_ref = Reference(ws, min_col=5, min_row=first, max_row=last)
-        auto_ref = Reference(ws, min_col=9, min_row=first, max_row=last)
-        x_ref = Reference(ws, min_col=6, min_row=first, max_row=last)
+            chart = LineChart()
+            chart.title = sheet_name
+            chart.x_axis.title = "time (s)"
+            chart.y_axis.title = "RPM"
+            chart.height = 9
+            chart.width = 18
+            chart.legend.position = "b"
 
-        chart.add_data(manual_ref, titles_from_data=False)
-        chart.add_data(auto_ref, titles_from_data=False)
-        chart.set_categories(x_ref)
+            first, last = 5, 5 + n_data - 1
+            # Auto RPM (col I = 9), Timestamp (col F = 6), Mean helper (col O = 15)
+            auto_ref = Reference(ws, min_col=9, min_row=first, max_row=last)
+            mean_ref = Reference(ws, min_col=15, min_row=first, max_row=last)
+            x_ref = Reference(ws, min_col=6, min_row=first, max_row=last)
 
-        chart.series[0].graphicalProperties = openpyxl.chart.shapes.GraphicalProperties(solidFill="1F77B4")
-        chart.series[0].graphicalProperties.line.solidFill = "1F77B4"
-        chart.series[0].graphicalProperties.line.width = 20000
-        chart.series[0].smooth = False
-        chart.series[0].tx = openpyxl.chart.series.SeriesLabel(v="Manual")
+            chart.add_data(auto_ref, titles_from_data=False)
+            chart.add_data(mean_ref, titles_from_data=False)
+            chart.set_categories(x_ref)
 
-        chart.series[1].graphicalProperties = openpyxl.chart.shapes.GraphicalProperties(solidFill="D62728")
-        chart.series[1].graphicalProperties.line.solidFill = "D62728"
-        chart.series[1].graphicalProperties.line.width = 18000
-        chart.series[1].graphicalProperties.line.dashStyle = "dash"
-        chart.series[1].smooth = False
-        chart.series[1].tx = openpyxl.chart.series.SeriesLabel(v="Auto")
+            # Auto: solid blue
+            chart.series[0].graphicalProperties = openpyxl.chart.shapes.GraphicalProperties(
+                solidFill="1F77B4")
+            chart.series[0].graphicalProperties.line.solidFill = "1F77B4"
+            chart.series[0].graphicalProperties.line.width = 22000
+            chart.series[0].smooth = False
+            chart.series[0].tx = openpyxl.chart.series.SeriesLabel(v="RPM (auto)")
 
-        # mean line via trendline (linear w/ forced constant ≈ moving avg-ish);
-        # simpler: skip trendline and let the lines speak. Add reference line by
-        # writing the mean into a helper column? we'll skip to keep the sheet clean.
+            # Mean: dashed light blue, thin
+            chart.series[1].graphicalProperties = openpyxl.chart.shapes.GraphicalProperties(
+                solidFill="6BAED6")
+            chart.series[1].graphicalProperties.line.solidFill = "6BAED6"
+            chart.series[1].graphicalProperties.line.width = 14000
+            chart.series[1].graphicalProperties.line.dashStyle = "dash"
+            chart.series[1].smooth = False
+            chart.series[1].tx = openpyxl.chart.series.SeriesLabel(
+                v=f"mean = {mean_auto:.2f}")
 
-        chart_anchor = f"P{first}"
-        ws.add_chart(chart, chart_anchor)
+            chart_anchor = f"P{first}"
+            ws.add_chart(chart, chart_anchor)
 
     _autosize(ws, min_w=12, max_w=24)
     ws.freeze_panes = "A5"
