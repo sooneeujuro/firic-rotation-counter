@@ -44,13 +44,26 @@ def main():
         cfg = json.load(f)
 
     available_sheets = pd.ExcelFile(XLSX_IN).sheet_names
-    # Auto-inherit ROIs for sheets like "MARU2" -> "MARU"
+
+    def _sheet_init_frame(sn):
+        df = pd.read_excel(XLSX_IN, sheet_name=sn, header=None)
+        v = pd.to_numeric(df.iloc[3, 0], errors="coerce")
+        return int(v) if pd.notna(v) else None
+
+    # Auto-inherit ROIs for sheets like "MARU2" -> "MARU", but read init_frame
+    # from each sheet so segments use their own measurement window.
     for s in available_sheets:
         if s in cfg:
+            init = _sheet_init_frame(s)
+            if init is not None:
+                cfg[s]["init_frame"] = init
             continue
         m = re.match(r"^(.+?)(\d+)$", s)
         if m and m.group(1) in cfg:
+            init = _sheet_init_frame(s)
             cfg[s] = {**cfg[m.group(1)]}
+            if init is not None:
+                cfg[s]["init_frame"] = init
     sheets = [s for s in available_sheets if s in cfg]
 
     summary_df, all_results = run_batch(XLSX_IN, VIDEO_DIR, cfg, sheets, OUT_DIR)

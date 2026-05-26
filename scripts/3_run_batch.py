@@ -23,25 +23,33 @@ OUT_DIR = os.path.join(ROOT, "output")
 
 
 def main():
+    import re
+    import pandas as pd
+
     with open(ROI_PATH, "r", encoding="utf-8") as f:
         cfg = json.load(f)
 
-    # Discover sheets from ROI config. Any sheet that exists in the spreadsheet
-    # but reuses another's ROI (e.g. MARU2 reuses MARU) can be added manually here.
-    import pandas as pd
     available_sheets = pd.ExcelFile(XLSX).sheet_names
-    sheets = [s for s in available_sheets if s in cfg]
-    # Allow extra sheets that share a ROI with a configured one
-    # (convention: trailing digit suffix like "MARU2" inherits from "MARU")
-    import re
+
+    def _sheet_init_frame(sn: str) -> int | None:
+        df = pd.read_excel(XLSX, sheet_name=sn, header=None)
+        v = pd.to_numeric(df.iloc[3, 0], errors="coerce")
+        return int(v) if pd.notna(v) else None
+
+    # Inherit ROI for sheets like "MARU2" -> "MARU", but read init_frame from the
+    # sheet itself so each segment starts at its own measurement window.
     for s in available_sheets:
         if s in cfg:
+            init = _sheet_init_frame(s)
+            if init is not None:
+                cfg[s]["init_frame"] = init
             continue
         m = re.match(r"^(.+?)(\d+)$", s)
-        if m and m.group(1) in cfg and s not in sheets:
+        if m and m.group(1) in cfg:
+            init = _sheet_init_frame(s)
             cfg[s] = {**cfg[m.group(1)]}
-            sheets.append(s)
-    # Preserve workbook order
+            if init is not None:
+                cfg[s]["init_frame"] = init
     sheets = [s for s in available_sheets if s in cfg]
 
     summary_df, all_results = run_batch(XLSX, VIDEO_DIR, cfg, sheets, OUT_DIR)
