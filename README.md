@@ -1,8 +1,8 @@
 # firic-rotation-counter
 
-<!-- After Zenodo issues the DOI, replace BADGE_ID and DOI_HERE below.
+<!-- After Zenodo issues the DOI, replace 1250672477 and 20402770 below.
      The badge URL is shown on your Zenodo deposit page. -->
-[![DOI](https://zenodo.org/badge/BADGE_ID.svg)](https://doi.org/10.5281/zenodo.DOI_HERE)
+[![DOI](https://zenodo.org/badge/1250672477.svg)](https://doi.org/10.5281/zenodo.20402770)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Automated rotation counting from underwater ROV flowmeter videos.
@@ -155,7 +155,7 @@ If you use this software in research, please cite the archived release:
 
 > AUTHOR_LAST, AUTHOR_FIRST (2026). *firic-rotation-counter: automated
 > rotation counting from ROV underwater flowmeter videos* (Version 0.1.0)
-> [Software]. Zenodo. https://doi.org/10.5281/zenodo.DOI_HERE
+> [Software]. Zenodo. https://doi.org/10.5281/zenodo.20402770
 
 Machine-readable citation metadata is in
 [`CITATION.cff`](CITATION.cff); GitHub renders it as a "Cite this

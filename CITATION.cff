@@ -17,7 +17,7 @@ date-released: "2026-05-27"
 license: MIT
 repository-code: "https://github.com/sooneeujuro/firic-rotation-counter"
 url: "https://github.com/sooneeujuro/firic-rotation-counter"
-# doi: "10.5281/zenodo.XXXXXXX"        # TODO: uncomment & fill after Zenodo publishes
+doi: "10.5281/zenodo.20402770"
 keywords:
   - rotation counting
   - hydrothermal vent
