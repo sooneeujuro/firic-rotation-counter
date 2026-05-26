@@ -2,10 +2,94 @@
 from __future__ import annotations
 
 import os
+from typing import Iterable
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
+
+def plot_vent_summary(all_results: dict, out_path: str | None = None,
+                      dpi: int = 110, log_y: bool | None = None):
+    """One-glance summary across multiple measurement segments.
+
+    Bar chart of per-sheet mean auto-RPM with std as error bar, sorted
+    by ascending mean. If `log_y` is None, auto-enables log scale when the
+    max/min ratio is > 5 (typical when slow and fast vents coexist).
+
+    Returns the matplotlib Figure (also saves to `out_path` if provided).
+    """
+    rows = []
+    for sheet, (res, trace) in all_results.items():
+        valid = res.dropna(subset=["rpm_auto"])
+        if len(valid) == 0:
+            continue
+        rows.append({
+            "sheet": sheet,
+            "mean": float(valid["rpm_auto"].mean()),
+            "std": float(valid["rpm_auto"].std(ddof=0)) if len(valid) > 1 else 0.0,
+            "min": float(valid["rpm_auto"].min()),
+            "max": float(valid["rpm_auto"].max()),
+            "indicator": trace.get("indicator", ""),
+        })
+    if not rows:
+        return None
+    df = pd.DataFrame(rows).sort_values("mean").reset_index(drop=True)
+
+    n = len(df)
+    fig, ax = plt.subplots(figsize=(max(6, 0.6 * n + 3), 5))
+    colors = ["#4C78A8" if ind == "R" else "#F58518" for ind in df["indicator"]]
+    bars = ax.bar(df["sheet"], df["mean"], yerr=df["std"], capsize=4,
+                  color=colors, edgecolor="black", linewidth=0.6, alpha=0.85)
+    for b, m in zip(bars, df["mean"]):
+        ax.text(b.get_x() + b.get_width() / 2, b.get_height(),
+                f"{m:.1f}", ha="center", va="bottom", fontsize=9)
+
+    if log_y is None:
+        log_y = (df["mean"].max() / max(df["mean"].min(), 1e-9)) > 5
+    if log_y:
+        ax.set_yscale("log")
+    ax.set_ylabel("Mean RPM (auto, ± SD)")
+    ax.set_title(f"Per-segment summary  (n = {n})")
+    ax.tick_params(axis="x", rotation=30)
+    ax.grid(True, axis="y", alpha=0.3)
+    from matplotlib.patches import Patch
+    legend_items = [
+        Patch(facecolor="#4C78A8", edgecolor="black", label="Indicator R"),
+        Patch(facecolor="#F58518", edgecolor="black", label="Indicator Y"),
+    ]
+    ax.legend(handles=legend_items, loc="upper left", fontsize=9)
+    plt.tight_layout()
+    if out_path:
+        os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+        plt.savefig(out_path, dpi=dpi, bbox_inches="tight")
+    return fig
+
+
+def plot_vent_boxplot(all_results: dict, out_path: str | None = None, dpi: int = 110):
+    """Per-vent RPM distribution boxplot. For 'rich' reports."""
+    data, labels, indicators = [], [], []
+    for sheet, (res, trace) in all_results.items():
+        v = res.dropna(subset=["rpm_auto"])["rpm_auto"].values
+        if len(v) >= 1:
+            data.append(v)
+            labels.append(sheet)
+            indicators.append(trace.get("indicator", ""))
+    if not data:
+        return None
+    fig, ax = plt.subplots(figsize=(max(6, 0.7 * len(data) + 3), 5))
+    bp = ax.boxplot(data, tick_labels=labels, patch_artist=True, widths=0.6)
+    for patch, ind in zip(bp["boxes"], indicators):
+        patch.set_facecolor("#4C78A8" if ind == "R" else "#F58518")
+        patch.set_alpha(0.7)
+    ax.set_ylabel("RPM (auto)")
+    ax.set_title("Per-segment RPM distribution")
+    ax.tick_params(axis="x", rotation=30)
+    ax.grid(True, axis="y", alpha=0.3)
+    plt.tight_layout()
+    if out_path:
+        plt.savefig(out_path, dpi=dpi, bbox_inches="tight")
+    return fig
 
 
 def plot_summary_grid(all_results: dict, out_path: str, dpi: int = 85):

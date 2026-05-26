@@ -100,14 +100,28 @@ python scripts/3_run_batch.py
 
 # step 4 — aggregate stats + Bland-Altman plot
 python scripts/4_analyze.py
+
+# step 5 — build the archive xlsx (Methodology + Summary + per-segment sheets)
+python scripts/5_export_xlsx.py
+# add --rich for boxplot + Manual-vs-Auto + Bland-Altman embedded in Summary
+python scripts/5_export_xlsx.py --rich
 ```
+
+**Works with one or many segments.** Steps 3 and 5 auto-discover which
+worksheets in `data/For print.xlsx` to process from the ROI config —
+just add boxes for whatever segments you have. A sheet whose name ends
+with a digit (e.g. `MARU2`) automatically inherits the ROI of its
+prefix (`MARU`).
 
 Outputs land in `output/`:
 
-- `coarse_roi.json`, `roi_config.json` — ROI configuration per sheet
-- `compare_<sheet>.csv` — per-row Excel vs auto comparison
-- `summary.csv` — per-sheet aggregate stats
-- `all_sheets_compare.png`, `agreement_analysis.png` — plots
+- `coarse_roi.json`, `roi_config.json` — ROI configuration per segment
+- `compare_<segment>.csv` — per-row Excel vs auto comparison
+- `summary.csv` — per-segment aggregate stats
+- `all_sheets_compare.png`, `agreement_analysis.png` — diagnostic plots
+- `firic_analysis_archive.xlsx` — archive-ready workbook with
+  Methodology, Summary (per-segment mean RPM bar chart), per-segment
+  sheets (manual + auto blocks + embedded ScatterChart of RPM vs time)
 
 ## Library usage
 

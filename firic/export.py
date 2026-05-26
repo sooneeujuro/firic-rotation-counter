@@ -14,11 +14,16 @@ from __future__ import annotations
 import os
 from datetime import datetime
 
+import io
+import os
+import tempfile
+
 import openpyxl
 import pandas as pd
-from openpyxl.chart import LineChart, Reference
+from openpyxl.chart import LineChart, Reference, ScatterChart, Series
 from openpyxl.chart.layout import Layout, ManualLayout
 from openpyxl.chart.trendline import Trendline
+from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
@@ -275,60 +280,71 @@ def _write_sheet(wb, sheet_name: str, raw: pd.DataFrame, res: pd.DataFrame, indi
     c.alignment = LEFT
     ws.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=14)
 
-    # RPM time-series chart (auto RPM + mean line)
+    # RPM time-series chart (ScatterChart so X axis is numeric and starts at 0)
     n_data = len(data)
     if n_data >= 2:
-        # Helper column O (15) = repeated mean of auto RPM. Used only for the chart;
-        # column is hidden from the user view.
         valid_auto = res["rpm_auto"].dropna()
         if len(valid_auto) > 0:
             mean_auto = float(valid_auto.mean())
+            # Helper column O (15): repeated mean (hidden) for chart line
             for i in range(n_data):
                 c = ws.cell(row=5 + i, column=15, value=mean_auto)
                 c.number_format = "0.00"
             ws.column_dimensions[get_column_letter(15)].hidden = True
 
-            chart = LineChart()
+            chart = ScatterChart()
             chart.title = sheet_name
+            chart.style = 2
             chart.x_axis.title = "time (s)"
             chart.y_axis.title = "RPM"
+            chart.x_axis.scaling.min = 0  # explicit X-axis start at 0
             chart.height = 9
             chart.width = 18
             chart.legend.position = "b"
 
             first, last = 5, 5 + n_data - 1
-            # Auto RPM (col I = 9), Timestamp (col F = 6), Mean helper (col O = 15)
+            x_ref = Reference(ws, min_col=6, min_row=first, max_row=last)
             auto_ref = Reference(ws, min_col=9, min_row=first, max_row=last)
             mean_ref = Reference(ws, min_col=15, min_row=first, max_row=last)
-            x_ref = Reference(ws, min_col=6, min_row=first, max_row=last)
 
-            chart.add_data(auto_ref, titles_from_data=False)
-            chart.add_data(mean_ref, titles_from_data=False)
-            chart.set_categories(x_ref)
-
-            # Auto: solid blue
-            chart.series[0].graphicalProperties = openpyxl.chart.shapes.GraphicalProperties(
+            # Auto line (with markers)
+            s_auto = Series(values=auto_ref, xvalues=x_ref, title="RPM (auto)")
+            s_auto.graphicalProperties = openpyxl.chart.shapes.GraphicalProperties(
                 solidFill="1F77B4")
-            chart.series[0].graphicalProperties.line.solidFill = "1F77B4"
-            chart.series[0].graphicalProperties.line.width = 22000
-            chart.series[0].smooth = False
-            chart.series[0].tx = openpyxl.chart.series.SeriesLabel(v="RPM (auto)")
+            s_auto.graphicalProperties.line.solidFill = "1F77B4"
+            s_auto.graphicalProperties.line.width = 22000
+            s_auto.smooth = False
+            chart.series.append(s_auto)
 
-            # Mean: dashed light blue, thin
-            chart.series[1].graphicalProperties = openpyxl.chart.shapes.GraphicalProperties(
+            # Mean dashed line
+            s_mean = Series(values=mean_ref, xvalues=x_ref,
+                            title=f"mean = {mean_auto:.2f}")
+            s_mean.graphicalProperties = openpyxl.chart.shapes.GraphicalProperties(
                 solidFill="6BAED6")
-            chart.series[1].graphicalProperties.line.solidFill = "6BAED6"
-            chart.series[1].graphicalProperties.line.width = 14000
-            chart.series[1].graphicalProperties.line.dashStyle = "dash"
-            chart.series[1].smooth = False
-            chart.series[1].tx = openpyxl.chart.series.SeriesLabel(
-                v=f"mean = {mean_auto:.2f}")
+            s_mean.graphicalProperties.line.solidFill = "6BAED6"
+            s_mean.graphicalProperties.line.width = 14000
+            s_mean.graphicalProperties.line.dashStyle = "dash"
+            s_mean.smooth = False
+            chart.series.append(s_mean)
 
-            chart_anchor = f"P{first}"
-            ws.add_chart(chart, chart_anchor)
+            ws.add_chart(chart, f"P{first}")
 
     _autosize(ws, min_w=12, max_w=24)
     ws.freeze_panes = "A5"
+
+
+def _embed_matplotlib_chart(ws, fig, anchor: str, scale: float = 1.0):
+    """Render a matplotlib Figure to PNG and embed in the worksheet."""
+    import matplotlib.pyplot as plt
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=110, bbox_inches="tight")
+    plt.close(fig)
+    buf.seek(0)
+    img = XLImage(buf)
+    if scale != 1.0:
+        img.width = int(img.width * scale)
+        img.height = int(img.height * scale)
+    ws.add_image(img, anchor)
 
 
 def export_archive_xlsx(
@@ -339,6 +355,7 @@ def export_archive_xlsx(
     doi: str,
     author: str,
     affiliation: str,
+    rich: bool = False,
 ):
     """Write a full archive-ready xlsx.
 
@@ -378,6 +395,61 @@ def export_archive_xlsx(
     for sheet, (res, trace) in all_results.items():
         raw = pd.read_excel(src_xlsx_path, sheet_name=sheet, header=None)
         _write_sheet(wb, sheet, raw, res, trace["indicator"])
+
+    # Embed a small per-vent summary chart on the Summary sheet (only meaningful for N≥2)
+    if len(all_results) >= 2:
+        from .viz import plot_vent_summary
+        ws_sum = wb["Summary"]
+        anchor_row = 4 + len(summary_df) + 3
+        fig = plot_vent_summary(all_results)
+        if fig is not None:
+            _embed_matplotlib_chart(ws_sum, fig, f"A{anchor_row}", scale=0.85)
+
+        if rich:
+            from .viz import plot_vent_boxplot, plot_agreement
+            anchor_row2 = anchor_row + 28
+            fig2 = plot_vent_boxplot(all_results)
+            if fig2 is not None:
+                _embed_matplotlib_chart(ws_sum, fig2, f"A{anchor_row2}", scale=0.85)
+            anchor_row3 = anchor_row2 + 28
+            combined = pd.concat(
+                [r for r, _ in all_results.values()], ignore_index=True
+            ).dropna(subset=["rpm_auto"])
+            if "sheet" not in combined.columns:
+                # rebuild sheet column from order
+                combined = pd.concat(
+                    [r.assign(sheet=s) for s, (r, _) in all_results.items()],
+                    ignore_index=True,
+                ).dropna(subset=["rpm_auto"])
+            import matplotlib.pyplot as plt
+            fig3, axes = plt.subplots(1, 2, figsize=(12, 5))
+            df = combined.copy()
+            df["rpm_diff"] = df["rpm_auto"] - df["rpm_xl"]
+            axes[0].scatter(df["rpm_xl"], df["rpm_auto"], alpha=0.5, s=20)
+            lim = [df[["rpm_xl", "rpm_auto"]].min().min() - 5,
+                   df[["rpm_xl", "rpm_auto"]].max().max() + 5]
+            axes[0].plot(lim, lim, "k--", alpha=0.5, label="y = x")
+            axes[0].set_xlabel("Manual RPM")
+            axes[0].set_ylabel("Auto RPM")
+            axes[0].set_title(f"Manual vs Auto (n = {len(df)})")
+            axes[0].legend()
+            axes[0].grid(alpha=0.3)
+            axes[0].set_aspect("equal")
+            mean_rpm = (df["rpm_xl"] + df["rpm_auto"]) / 2
+            axes[1].scatter(mean_rpm, df["rpm_diff"], alpha=0.5, s=20)
+            axes[1].axhline(df["rpm_diff"].mean(), color="r",
+                            label=f"bias = {df['rpm_diff'].mean():.2f}")
+            axes[1].axhline(df["rpm_diff"].mean() + 1.96 * df["rpm_diff"].std(),
+                            color="r", ls="--", alpha=0.5)
+            axes[1].axhline(df["rpm_diff"].mean() - 1.96 * df["rpm_diff"].std(),
+                            color="r", ls="--", alpha=0.5)
+            axes[1].set_xlabel("Mean RPM")
+            axes[1].set_ylabel("Auto − Manual")
+            axes[1].set_title("Bland-Altman agreement")
+            axes[1].legend()
+            axes[1].grid(alpha=0.3)
+            plt.tight_layout()
+            _embed_matplotlib_chart(ws_sum, fig3, f"A{anchor_row3}", scale=0.85)
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     wb.save(out_path)

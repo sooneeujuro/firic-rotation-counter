@@ -30,17 +30,30 @@ DOI = "10.5281/zenodo.20402770"
 AUTHOR = "Kim, Heejun"
 AFFILIATION = "Korea Institute of Ocean Science & Technology"
 
-SHEETS = ["MARU", "MARU2", "CHEOEUM", "CHEOEUM_2", "ONNURI",
-          "SAERO_1", "SAERO_2", "ONBADA", "ONBADA_2", "ONNARE", "ONNARE_2"]
-
 
 def main():
+    import argparse, re
+    import pandas as pd
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--rich", action="store_true",
+                    help="Include extra summary visualizations (boxplot, scatter).")
+    args = ap.parse_args()
+
     with open(ROI_PATH, "r", encoding="utf-8") as f:
         cfg = json.load(f)
-    if "MARU" in cfg and "MARU2" not in cfg:
-        cfg["MARU2"] = {**cfg["MARU"]}
 
-    summary_df, all_results = run_batch(XLSX_IN, VIDEO_DIR, cfg, SHEETS, OUT_DIR)
+    available_sheets = pd.ExcelFile(XLSX_IN).sheet_names
+    # Auto-inherit ROIs for sheets like "MARU2" -> "MARU"
+    for s in available_sheets:
+        if s in cfg:
+            continue
+        m = re.match(r"^(.+?)(\d+)$", s)
+        if m and m.group(1) in cfg:
+            cfg[s] = {**cfg[m.group(1)]}
+    sheets = [s for s in available_sheets if s in cfg]
+
+    summary_df, all_results = run_batch(XLSX_IN, VIDEO_DIR, cfg, sheets, OUT_DIR)
 
     out = export_archive_xlsx(
         src_xlsx_path=XLSX_IN,
@@ -50,6 +63,7 @@ def main():
         doi=DOI,
         author=AUTHOR,
         affiliation=AFFILIATION,
+        rich=args.rich,
     )
     print(f"saved {out}")
 
