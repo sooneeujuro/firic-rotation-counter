@@ -113,11 +113,18 @@ counted. The algorithm:
 The output preserves which fallback fired in the `src` column
 (R / Y / R+Y / P-est) so partial-success rows are auditable.
 
+The frame rate in step 3 is read from each video's container
+(`cv2.CAP_PROP_FPS`), not assumed. RPM is linear in fps, so a wrong
+constant would bias every value by the same percentage. All ten clips in
+the validation set are constant-frame-rate 30000/1001 ≈ 29.97 fps, but the
+pipeline reads it per file so footage from a different camera works
+unchanged.
+
 ## Validation
 
-Across 11 sheets and 227 rows:
+Across 11 sheets and 232 rows:
 
-- 219 rows match the manual rotation count exactly.
+- 224 rows match the manual rotation count exactly.
 - Median row has zero RPM difference.
 - The eight mismatched rows split into:
   - **4 fully-occluded** (CHEOEUM rows 3, 8, 20, 26): even weak peaks

@@ -73,6 +73,10 @@ def _write_methodology(wb, doi: str, summary_overall: dict, author: str, affilia
         ("Method", "Two-stage ROI (manual coarse + automatic flicker-based fine ROI), "
                   "HSV color-channel peak detection, autocorrelation-based period "
                   "estimation, smoke-occlusion-aware peak interpolation."),
+        ("Frame rate", f"Read per video from the container (cv2.CAP_PROP_FPS); "
+                       f"this dataset: {summary_overall.get('fps_str', 'n/a')}. "
+                       f"Frame counts are converted to seconds with this rate "
+                       f"(RPM is linear in fps)."),
         ("Validation", f"{summary_overall['matched']} "
                        f"({summary_overall['match_pct']:.1f}%) row-level rotation "
                        f"integer match against manual frame-by-frame counting; "
@@ -378,11 +382,20 @@ def export_archive_xlsx(
     combined = pd.concat(
         [r for r, _ in all_results.values()], ignore_index=True
     ).dropna(subset=["rpm_auto"])
+    fps_values = sorted({round(float(t["fps"]), 3)
+                         for _, t in all_results.values() if t.get("fps")})
+    if not fps_values:
+        fps_str = "n/a"
+    elif len(fps_values) == 1:
+        fps_str = f"{fps_values[0]:.3f} fps"
+    else:
+        fps_str = f"{fps_values[0]:.3f}–{fps_values[-1]:.3f} fps"
     summary_overall = {
         "n_rows": n_total,
         "matched": f"{n_match}/{n_valid}",
         "match_pct": n_match / n_valid * 100,
         "median_rel_err": float(combined["rpm_err_pct"].abs().median()),
+        "fps_str": fps_str,
     }
 
     wb = openpyxl.Workbook()

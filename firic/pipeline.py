@@ -26,7 +26,28 @@ from .detection import (
     estimate_period, smoke_aware_peaks,
 )
 
-FPS_DEFAULT = 30000 / 1001  # 29.97 fps
+FPS_DEFAULT = 30000 / 1001  # 29.97 fps — NTSC fallback only
+
+
+def read_video_fps(video_path: str, fallback: float = FPS_DEFAULT) -> float:
+    """Read the frame rate directly from the video container.
+
+    Uses ``cv2.CAP_PROP_FPS`` (the stream's nominal frame rate). For
+    constant-frame-rate footage this is exactly the sampling rate used to
+    convert frame counts to seconds, so the RPM scale is correct regardless
+    of which camera produced the file. Falls back to ``fallback`` (29.97)
+    only if the container reports a missing or implausible value.
+
+    Because RPM is linear in fps (rpm = rotations / (frames / fps) * 60),
+    a wrong fps biases every RPM by the same percentage — hence reading it
+    per-video rather than assuming a constant.
+    """
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    cap.release()
+    if fps and 1.0 < fps < 1000.0:
+        return float(fps)
+    return fallback
 
 
 def process_sheet(
@@ -34,9 +55,15 @@ def process_sheet(
     sheet: str,
     video_dir: str,
     config: dict,
-    fps: float = FPS_DEFAULT,
+    fps: float | None = None,
 ):
     """Process one Excel sheet end-to-end.
+
+    Parameters
+    ----------
+    fps : float or None
+        Frame rate for frame→second conversion. If None (default), it is
+        read from the video file itself via :func:`read_video_fps`.
 
     Returns
     -------
@@ -44,11 +71,13 @@ def process_sheet(
         Per-row comparison: rotation/rpm xl vs auto, error, peak counts.
     trace : dict
         Time-series data for downstream visualization
-        (frames, reds, yels, r_pf, y_pf, fine_roi, indicator).
+        (frames, reds, yels, r_pf, y_pf, fine_roi, indicator, fps).
     """
     info = config[sheet]
     fx, fy, fw, fh = info["fine_roi"]
     video_path = os.path.join(video_dir, info["video"])
+    if fps is None:
+        fps = read_video_fps(video_path)
 
     raw = pd.read_excel(xlsx_path, sheet_name=sheet, header=None)
     data = raw.iloc[3:, :6].reset_index(drop=True)
@@ -144,6 +173,7 @@ def process_sheet(
         "fine_roi": (fx, fy, fw, fh),
         "indicator": indicator,
         "period_r": period_r, "period_y": period_y,
+        "fps": fps,
     }
     return res, trace
 
@@ -154,7 +184,7 @@ def run_batch(
     config: dict,
     sheets: list[str],
     out_dir: str,
-    fps: float = FPS_DEFAULT,
+    fps: float | None = None,
 ):
     """Run process_sheet over many sheets and write per-sheet CSVs + summary.
 

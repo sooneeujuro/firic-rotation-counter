@@ -17,12 +17,12 @@ two-stage ROI pipeline and smoke-aware peak detection. Validated against
 | Metric | Value |
 |---|---|
 | Sheets | 11 (10 unique videos) |
-| Rows compared | 227 |
-| Rotation integer match | **219 / 227 (96.5 %)** |
+| Rows compared | 232 |
+| Rotation integer match | **224 / 232 (96.6 %)** |
 | Median \|relative error\| | **0.00 %** |
-| Mean \|relative error\| | 2.46 % |
-| 95th percentile \|relative error\| | 9 % |
-| Bias (auto − manual) | −1.8 RPM |
+| Mean \|relative error\| | 2.79 % |
+| 95th percentile \|relative error\| | 8.7 % |
+| Bias (auto − manual) | −1.65 RPM |
 
 Eight of the eleven sheets achieve 100 % rotation match. The remaining
 mismatches are localized to segments where smoke from the hydrothermal
