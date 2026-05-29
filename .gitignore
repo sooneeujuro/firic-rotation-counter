@@ -22,3 +22,7 @@ samples/
 .idea/
 .DS_Store
 *.bak
+
+# FIRIC-specific flow conversion (site constants, not part of the generic package)
+flow_report.py
+compare_*_flow.csv
